@@ -1,0 +1,4 @@
+selim 1 Gurur_ve_Onyargi
+selim 2 Ucurtma_Avcisi
+emre 25 Kuyucakli_Yusuf
+selim 26 Icimizdeki_Seytan

@@ -1,50 +1,111 @@
-Ince Memed - Yasar Kemal
-Tutunamayanlar - Oguz Atay
-Saatleri Ayarlama Enstitusu - Ahmet Hamdi Tanpinar
-Calikusu - Resat Nuri Guntekin
-Ask-i Memnu - Halid Ziya Usakligil
-Kurk Mantolu Madonna - Sabahattin Ali
-Kuyucakli Yusuf - Sabahattin Ali
-Icimizdeki Seytan - Sabahattin Ali
-Aylak Adam - Yusuf Atilgan
-Dokuzuncu Hariciye Kogusu - Peyami Safa
-Fatih-Harbiye - Peyami Safa
-Serenad - Zulfu Livaneli
-Benim Adim Kirmizi - Orhan Pamuk
-Kara Kitap - Orhan Pamuk
-Puslu Kitalar Atlasi - Ihsan Oktay Anar
-Tehlikeli Oyunlar - Oguz Atay
-Yaban - Yakup Kadri Karaosmanoglu
-Memleketimden Insan Manzaralari - Nazim Hikmet
-Kendi Gok Kubbemiz - Yahya Kemal Beyatli
-Devlet Ana - Kemal Tahir
-1984 - George Orwell
-Animal Farm - George Orwell
-Crime and Punishment - Fyodor Dostoevsky
-The Brothers Karamazov - Fyodor Dostoevsky
-Pride and Prejudice - Jane Austen
-The Great Gatsby - F. Scott Fitzgerald
-To Kill a Mockingbird - Harper Lee
-The Catcher in the Rye - J.D. Salinger
-Brave New World - Aldous Huxley
-Fahrenheit 451 - Ray Bradbury
-Martin Eden - Jack London
-The Stranger - Albert Camus
-The Metamorphosis - Franz Kafka
-Of Mice and Men - John Steinbeck
-The Grapes of Wrath - John Steinbeck
-Moby Dick - Herman Melville
-Jane Eyre - Charlotte Bronte
-Wuthering Heights - Emily Bronte
-Don Quixote - Miguel de Cervantes
-Les Miserables - Victor Hugo
-Anna Karenina - Leo Tolstoy
-War and Peace - Leo Tolstoy
-The Little Prince - Antoine de Saint-Exupery
-Harry Potter and the Philosopher's Stone - J.K. Rowling
-The Lord of the Rings - J.R.R. Tolkien
-The Kite Runner - Khaled Hosseini
-The Alchemist - Paulo Coelho
-One Hundred Years of Solitude - Gabriel Garcia Marquez
-The Old Man and the Sea - Ernest Hemingway
-Murder on the Orient Express - Agatha Christie
+1 Gurur_ve_Onyargi Jane_Austen 0
+2 Ucurtma_Avcisi Khaled_Hosseini 0
+3 Hayvan_Ciftligi George_Orwell 1
+4 Cesur_Yeni_Dunya Aldous_Huxley 1
+5 Fareler_ve_Insanlar John_Steinbeck 1
+6 Gazap_Uzumleri John_Steinbeck 1
+7 Yabanci Albert_Camus 1
+8 Veba Albert_Camus 1
+9 Donusum Franz_Kafka 1
+10 Dava Franz_Kafka 1
+11 Beyaz_Dis Jack_London 1
+12 Martin_Eden Jack_London 1
+13 Yeraltindan_Notlar Fyodor_Dostoyevski 1
+14 Budala Fyodor_Dostoyevski 1
+15 Kumarbaz Fyodor_Dostoyevski 1
+16 Gulyabani Huseyin_Rahmi_Gurpinar 1
+17 Calikusu Resat_Nuri_Guntekin 1
+18 Acimak Resat_Nuri_Guntekin 1
+19 Yaprak_Dokumu Resat_Nuri_Guntekin 1
+20 Araba_Sevdasi Recaizade_Mahmut_Ekrem 1
+21 Intibah Namik_Kemal 1
+22 Eylul Mehmet_Rauf 1
+23 Ask-i_Memnu Halid_Ziya_Usakligil 1
+24 Mai_ve_Siyah Halid_Ziya_Usakligil 1
+25 Kuyucakli_Yusuf Sabahattin_Ali 0
+26 Icimizdeki_Seytan Sabahattin_Ali 0
+27 Saatleri_Ayarlama_Enstitusu Ahmet_Hamdi_Tanpinar 1
+28 Huzur Ahmet_Hamdi_Tanpinar 1
+29 Tutunamayanlar Oguz_Atay 1
+30 Tehlikeli_Oyunlar Oguz_Atay 1
+31 Aylak_Adam Yusuf_Atilgan 1
+32 Anayurt_Oteli Yusuf_Atilgan 1
+33 Ince_Memed Yasar_Kemal 1
+34 Yilanin_Ocu Fakir_Baykurt 1
+35 Bereketli_Topraklar_Uzerinde Orhan_Kemal 1
+36 Murtaza Orhan_Kemal 1
+37 Devlet_Ana Kemal_Tahir 1
+38 Yorgun_Savasci Kemal_Tahir 1
+39 Benim_Adim_Kirmizi Orhan_Pamuk 1
+40 Kar Orhan_Pamuk 1
+41 Masumiyet_Muzesi Orhan_Pamuk 1
+42 Kara_Kitap Orhan_Pamuk 1
+43 Puslu_Kitalar_Atlasi Ihsan_Oktay_Anar 1
+44 Amat Ihsan_Oktay_Anar 1
+45 Suskunlar Ihsan_Oktay_Anar 1
+46 Kinyas_ve_Kayra Hakan_Gunday 1
+47 Az Hakan_Gunday 1
+48 Ziyan Hakan_Gunday 1
+49 Daha Hakan_Gunday 1
+50 Kirmizi_Sacli_Kadin Orhan_Pamuk 1
+51 Semerkant Amin_Maalouf 1
+52 Dogunun_Limanlari Amin_Maalouf 1
+53 Afrikali_Leo Amin_Maalouf 1
+54 Yuz_Yillik_Yalnizlik Gabriel_Garcia_Marquez 1
+55 Kolera_Gunlerinde_Ask Gabriel_Garcia_Marquez 1
+56 Kirmizi_Pazartesi Gabriel_Garcia_Marquez 1
+57 Korluk Jose_Saramago 1
+58 Gormek Jose_Saramago 1
+59 Magara Jose_Saramago 1
+60 Fahrenheit_451 Ray_Bradbury 1
+61 Zaman_Makinesi H.G.Wells 1
+62 Gorunmez_Adam H.G.Wells 1
+63 Dunyalar_Savasi H.G.Wells 1
+64 Frankenstein Mary_Shelley 1
+65 Dracula Bram_Stoker 1
+66 Dorian_Grayin_Portresi Oscar_Wilde 1
+67 Ilahi_Komedi Dante_Alighieri 1
+68 Odysseia Homeros 1
+69 Ilyada Homeros 1
+70 Hamlet William_Shakespeare 1
+71 Romeo_ve_Juliet William_Shakespeare 1
+72 Macbeth William_Shakespeare 1
+73 Othello William_Shakespeare 1
+74 Faust Johann_Wolfgang_von_Goethe 1
+75 Genc_Wertherin_Acilari Johann_Wolfgang_von_Goethe 1
+76 Notre_Dame_in_Kamburu Victor_Hugo 1
+77 Vadideki_Zambak Honore_de_Balzac 1
+78 Goriot_Baba Honore_de_Balzac 1
+79 Kirmizi_ve_Siyah Stendhal 1
+80 Parma_Manastiri Stendhal 1
+81 Madame_Bovary Gustave_Flaubert 1
+82 Duygusal_Egitim Gustave_Flaubert 1
+83 Gulun_Adi Umberto_Eco 1
+84 Foucault_Sarkaci Umberto_Eco 1
+85 Moby_Dick Herman_Melville 1
+86 Muhtesem_Gatsby F.Scott_Fitzgerald 1
+87 Cizgili_Pijamali_Cocuk John_Boyne 1
+88 Kitap_Hirsizi Markus_Zusak 1
+89 Koku Patrick_Suskind 1
+90 Bati_Cephesinde_Yeni_Bir_Sey_Yok Erich_Maria_Remarque 1
+91 Savas_Sanati Sun_Tzu 1
+92 Hukumdar Niccolo_Machiavelli 1
+93 Toplum_Sozlesmesi Jean-Jacques_Rousseau 1
+94 Turlerin_Kokeni Charles_Darwin 1
+95 Denemeler Michel_de_Montaigne 1
+96 Boyle_Buyurdu_Zerdust Friedrich_Nietzsche 1
+97 Sofienin_Dunyasi Jostein_Gaarder 1
+98 Hobbit J.R.R.Tolkien 1
+99 Silmarillion J.R.R.Tolkien 1
+100 Otomatik_Portakal Anthony_Burgess 1
+101 Sefiller Victor_Hugo 1
+102 Suc_ve_Ceza Fyodor_Dostoyevski 1
+103 1984 George_Orwell 1
+104 Kurk_Mantolu_Madonna Sabahattin_Ali 1
+105 Simyaci Paulo_Coelho 1
+106 Harry_Potter J.K.Rowling 1
+107 Yuzuklerin_Efendisi J.R.R.Tolkien 1
+108 Nutuk Mustafa_Kemal_Ataturk 1
+109 Satranc Stefan_Zweig 1
+110 Serenad Zulfu_Livaneli 1
+111 Haci_Murat Tolstoy 1
