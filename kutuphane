@@ -1,0 +1,823 @@
+/*
+ * ============================================================
+ *  Kütüphane Envanter Yönetim Sistemi
+ *  İzmir Bakırçay Üniversitesi – BIL1203 Mühendislikte Proje Yönetimi
+ * ============================================================
+ *
+ *  İş Paketleri:
+ *   1. Kullanıcı girişi ve yetkilendirme (yönetici, personel, öğrenci)
+ *   2. Kitap ekleme, güncelleme ve silme
+ *   3. Kullanıcı hesabı yönetimi
+ *   4. Kitap ödünç alma ve iade işlemleri
+ *   5. Kitap arama ve listeleme
+ *   6. Raporlama ve istatistikler
+ *  Derleme:  gcc -o kutuphane kutuphane_sistemi.c
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+/*
+   SABİTLER
+*/
+#define MAX_KITAP       500
+#define MAX_KULLANICI   200
+#define MAX_ODUNC       300
+
+#define KITAP_DOSYA     "kitaplar.dat"
+#define KULLANICI_DOSYA "kullanicilar.dat"
+#define ODUNC_DOSYA     "odunc.dat"
+
+#define ODUNC_SURE_GUN  14   /* varsayılan ödünç süresi */
+
+/*
+   ENUMLAR
+*/
+typedef enum { YOK = 0, YONETICI = 1, PERSONEL = 2, OGRENCI = 3 } KullaniciRol;
+typedef enum { ODUNC_AKTIF = 0, ODUNC_IADE = 1 } OduncDurum;
+
+/*
+   YAPILAR (struct)
+*/
+typedef struct {
+    int    id;
+    char   isbn[20];
+    char   ad[100];
+    char   yazar[80];
+    char   yayinevi[80];
+    int    yayin_yili;
+    int    stok;
+    int    mevcut;   /* şu an rafta olan */
+    char   konum[30];
+    int    aktif;    /* 0 = silinmiş */
+} Kitap;
+
+typedef struct {
+    int          id;
+    char         kullanici_adi[40];
+    char         sifre_hash[64];   /* basit XOR hash */
+    char         ad_soyad[80];
+    char         email[60];
+    KullaniciRol rol;
+    int          aktif;
+} Kullanici;
+
+typedef struct {
+    int        id;
+    int        kullanici_id;
+    int        kitap_id;
+    char       odunc_tarih[12];   /* YYYY-MM-DD */
+    char       iade_tarih[12];
+    char       gercek_iade[12];
+    OduncDurum durum;
+} OduncKayit;
+
+/*
+   GLOBAL VERİ YAPILARI (bağlı liste yerine dizi + sayaç)
+*/
+Kitap      kitaplar[MAX_KITAP];
+int        kitap_sayisi = 0;
+
+Kullanici  kullanicilar[MAX_KULLANICI];
+int        kullanici_sayisi = 0;
+
+OduncKayit oduncler[MAX_ODUNC];
+int        odunc_sayisi = 0;
+
+Kullanici *aktif_kullanici = NULL;
+
+/*
+   YARDIMCI FONKSİYONLAR
+*/
+
+/* Basit XOR hash */
+void sifre_hashle(const char *sifre, char *cikti) {
+    unsigned int h = 5381;
+    const char *p = sifre;
+    while (*p) { h = ((h << 5) + h) ^ (unsigned char)*p++; }
+    sprintf(cikti, "%u", h);
+}
+
+/* Bugünün tarihini YYYY-MM-DD formatında döndürür */
+void bugun_tarih(char *tampon) {
+    time_t now = time(NULL);
+    struct tm *t = localtime(&now);
+    strftime(tampon, 12, "%Y-%m-%d", t);
+}
+
+/* İade tarihini hesapla */
+void iade_tarihi_hesapla(const char *baslangic, int gun, char *sonuc) {
+    struct tm t = {0};
+    sscanf(baslangic, "%d-%d-%d", &t.tm_year, &t.tm_mon, &t.tm_mday);
+    t.tm_year -= 1900;
+    t.tm_mon  -= 1;
+    time_t ts = mktime(&t);
+    ts += (time_t)gun * 86400;
+    struct tm *r = localtime(&ts);
+    strftime(sonuc, 12, "%Y-%m-%d", r);
+}
+
+/* İki tarih arasındaki gün farkı */
+int gun_farki(const char *t1, const char *t2) {
+    struct tm a = {0}, b = {0};
+    sscanf(t1, "%d-%d-%d", &a.tm_year, &a.tm_mon, &a.tm_mday);
+    sscanf(t2, "%d-%d-%d", &b.tm_year, &b.tm_mon, &b.tm_mday);
+    a.tm_year -= 1900; a.tm_mon -= 1;
+    b.tm_year -= 1900; b.tm_mon -= 1;
+    double sn = difftime(mktime(&b), mktime(&a));
+    return (int)(sn / 86400);
+}
+
+void ekrani_temizle(void) {
+#ifdef _WIN32
+    system("cls");
+#else
+    system("clear");
+#endif
+}
+
+void baslik_yazdir(const char *baslik) {
+    int uzunluk = (int)strlen(baslik);
+    int toplam  = 60;
+    int bosluk  = (toplam - uzunluk - 2) / 2;
+    printf("\n");
+    for (int i = 0; i < toplam; i++) printf("="); printf("\n");
+    for (int i = 0; i < bosluk; i++) printf(" ");
+    printf(" %s \n", baslik);
+    for (int i = 0; i < toplam; i++) printf("="); printf("\n");
+}
+
+/* Yeni ID üret */
+int yeni_kitap_id(void) {
+    int max = 0;
+    for (int i = 0; i < kitap_sayisi; i++)
+        if (kitaplar[i].id > max) max = kitaplar[i].id;
+    return max + 1;
+}
+int yeni_kullanici_id(void) {
+    int max = 0;
+    for (int i = 0; i < kullanici_sayisi; i++)
+        if (kullanicilar[i].id > max) max = kullanicilar[i].id;
+    return max + 1;
+}
+int yeni_odunc_id(void) {
+    int max = 0;
+    for (int i = 0; i < odunc_sayisi; i++)
+        if (oduncler[i].id > max) max = oduncler[i].id;
+    return max + 1;
+}
+
+/*
+   DOSYA İŞLEMLERİ
+*/
+void kitaplari_kaydet(void) {
+    FILE *f = fopen(KITAP_DOSYA, "wb");
+    if (!f) { printf("[HATA] Kitap dosyasi acilamadi.\n"); return; }
+    fwrite(&kitap_sayisi, sizeof(int), 1, f);
+    fwrite(kitaplar, sizeof(Kitap), kitap_sayisi, f);
+    fclose(f);
+}
+
+void kitaplari_yukle(void) {
+    FILE *f = fopen(KITAP_DOSYA, "rb");
+    if (!f) return;
+    fread(&kitap_sayisi, sizeof(int), 1, f);
+    fread(kitaplar, sizeof(Kitap), kitap_sayisi, f);
+    fclose(f);
+}
+
+void kullanicilari_kaydet(void) {
+    FILE *f = fopen(KULLANICI_DOSYA, "wb");
+    if (!f) { printf("[HATA] Kullanici dosyasi acilamadi.\n"); return; }
+    fwrite(&kullanici_sayisi, sizeof(int), 1, f);
+    fwrite(kullanicilar, sizeof(Kullanici), kullanici_sayisi, f);
+    fclose(f);
+}
+
+void kullanicilari_yukle(void) {
+    FILE *f = fopen(KULLANICI_DOSYA, "rb");
+    if (!f) return;
+    fread(&kullanici_sayisi, sizeof(int), 1, f);
+    fread(kullanicilar, sizeof(Kullanici), kullanici_sayisi, f);
+    fclose(f);
+}
+
+void oduncleri_kaydet(void) {
+    FILE *f = fopen(ODUNC_DOSYA, "wb");
+    if (!f) { printf("[HATA] Odunc dosyasi acilamadi.\n"); return; }
+    fwrite(&odunc_sayisi, sizeof(int), 1, f);
+    fwrite(oduncler, sizeof(OduncKayit), odunc_sayisi, f);
+    fclose(f);
+}
+
+void oduncleri_yukle(void) {
+    FILE *f = fopen(ODUNC_DOSYA, "rb");
+    if (!f) return;
+    fread(&odunc_sayisi, sizeof(int), 1, f);
+    fread(oduncler, sizeof(OduncKayit), odunc_sayisi, f);
+    fclose(f);
+}
+
+void tum_verileri_yukle(void) {
+    kitaplari_yukle();
+    kullanicilari_yukle();
+    oduncleri_yukle();
+}
+
+void tum_verileri_kaydet(void) {
+    kitaplari_kaydet();
+    kullanicilari_kaydet();
+    oduncleri_kaydet();
+}
+
+/*
+   VARSAYILAN YÖNETİCİ OLUŞTUR (ilk çalıştırma)
+*/
+
+void varsayilan_yonetici_olustur(void) {
+    for (int i = 0; i < kullanici_sayisi; i++)
+        if (kullanicilar[i].rol == YONETICI && kullanicilar[i].aktif)
+            return;   /* zaten var */
+
+    Kullanici k = {0};
+    k.id  = yeni_kullanici_id();
+    strcpy(k.kullanici_adi, "admin");
+    sifre_hashle("admin123", k.sifre_hash);
+    strcpy(k.ad_soyad, "Sistem Yoneticisi");
+    strcpy(k.email, "admin@kutuphane.edu.tr");
+    k.rol   = YONETICI;
+    k.aktif = 1;
+    kullanicilar[kullanici_sayisi++] = k;
+    kullanicilari_kaydet();
+    printf("[BILGI] Varsayilan yonetici olusturuldu. (admin / admin123)\n");
+}
+
+/*
+   GİRİŞ / YETKİLENDİRME  (İş Paketi 1)
+*/
+int kullanici_girisi(void) {
+    char kadi[40], sifre[40], hash[64];
+    baslik_yazdir("KULLANICI GIRISI");
+    printf("Kullanici adi : "); scanf("%39s", kadi);
+    printf("Sifre         : "); scanf("%39s", sifre);
+    sifre_hashle(sifre, hash);
+
+    for (int i = 0; i < kullanici_sayisi; i++) {
+        if (kullanicilar[i].aktif &&
+            strcmp(kullanicilar[i].kullanici_adi, kadi) == 0 &&
+            strcmp(kullanicilar[i].sifre_hash,    hash) == 0) {
+            aktif_kullanici = &kullanicilar[i];
+            printf("\nHos geldiniz, %s! ", kullanicilar[i].ad_soyad);
+            switch (kullanicilar[i].rol) {
+                case YONETICI: printf("[YONETICI]\n");  break;
+                case PERSONEL: printf("[PERSONEL]\n");   break;
+                case OGRENCI:  printf("[OGRENCI]\n");    break;
+                default: break;
+            }
+            return 1;
+        }
+    }
+    printf("\n[HATA] Kullanici adi veya şifre yanlis!\n");
+    return 0;
+}
+
+/*
+   KİTAP İŞLEMLERİ  (İş Paketi 2)
+*/
+
+/* Kitap ekle */
+void kitap_ekle(void) {
+    if (aktif_kullanici->rol == OGRENCI) {
+        printf("[YETKI HATASI] Bu islemi yapamazsiniz.\n"); return;
+    }
+    if (kitap_sayisi >= MAX_KITAP) {
+        printf("[HATA] Maksimum kitap sayisina ulaşildi.\n"); return;
+    }
+    Kitap k = {0};
+    k.id     = yeni_kitap_id();
+    k.aktif  = 1;
+
+    printf("ISBN        : "); scanf("%19s", k.isbn);
+    printf("Kitap adi   : "); scanf(" %99[^\n]", k.ad);
+    printf("Yazar       : "); scanf(" %79[^\n]", k.yazar);
+    printf("Yayinevi    : "); scanf(" %79[^\n]", k.yayinevi);
+    printf("Yayin yili  : "); scanf("%d", &k.yayin_yili);
+    printf("Stok adedi  : "); scanf("%d", &k.stok);
+    k.mevcut = k.stok;
+    printf("Konum (raf) : "); scanf("%29s", k.konum);
+
+    kitaplar[kitap_sayisi++] = k;
+    kitaplari_kaydet();
+    printf("[OK] Kitap eklendi. (ID: %d)\n", k.id);
+}
+
+/* Kitap güncelle */
+void kitap_guncelle(void) {
+    if (aktif_kullanici->rol == OGRENCI) {
+        printf("[YETKI HATASI] Bu islemi yapamazsiniz.\n"); return;
+    }
+    int id;
+    printf("Guncellenecek kitap ID: "); scanf("%d", &id);
+    for (int i = 0; i < kitap_sayisi; i++) {
+        if (kitaplar[i].id == id && kitaplar[i].aktif) {
+            Kitap *k = &kitaplar[i];
+            printf("Yeni ad   (mevcut: %s): ", k->ad);     scanf(" %99[^\n]", k->ad);
+            printf("Yeni yazar(mevcut: %s): ", k->yazar);  scanf(" %79[^\n]", k->yazar);
+            printf("Yeni stok (mevcut: %d): ", k->stok);
+            int yeni_stok; scanf("%d", &yeni_stok);
+            k->mevcut += (yeni_stok - k->stok);
+            k->stok    = yeni_stok;
+            printf("Yeni konum(mevcut: %s): ", k->konum);  scanf("%29s", k->konum);
+            kitaplari_kaydet();
+            printf("[OK] Kitap guncellendi.\n");
+            return;
+        }
+    }
+    printf("[HATA] Kitap bulunamadi.\n");
+}
+
+/* Kitap sil */
+void kitap_sil(void) {
+    if (aktif_kullanici->rol != YONETICI) {
+        printf("[YETKI HATASI] Sadece yoneticiler silebilir.\n"); return;
+    }
+    int id;
+    printf("Silinecek kitap ID: "); scanf("%d", &id);
+    for (int i = 0; i < kitap_sayisi; i++) {
+        if (kitaplar[i].id == id && kitaplar[i].aktif) {
+            /* Aktif ödünç var mı? */
+            for (int j = 0; j < odunc_sayisi; j++) {
+                if (oduncler[j].kitap_id == id && oduncler[j].durum == ODUNC_AKTIF) {
+                    printf("[HATA] Kitabin aktif odunc kaydi var, silinemez.\n");
+                    return;
+                }
+            }
+            kitaplar[i].aktif = 0;
+            kitaplari_kaydet();
+            printf("[OK] Kitap silindi.\n");
+            return;
+        }
+    }
+    printf("[HATA] Kitap bulunamadi.\n");
+}
+
+/*
+   KULLANICI YÖNETİMİ  (İş Paketi 3)
+*/
+
+void kullanici_ekle(void) {
+    if (aktif_kullanici->rol != YONETICI) {
+        printf("[YETKI HATASI] Sadece yoneticiler kullanici ekleyebilir.\n"); return;
+    }
+    if (kullanici_sayisi >= MAX_KULLANICI) {
+        printf("[HATA] Maksimum kullanici sayisina ulasildi.\n"); return;
+    }
+    Kullanici k = {0};
+    k.id    = yeni_kullanici_id();
+    k.aktif = 1;
+    char sifre[40];
+    int  rol_sec;
+
+    printf("Kullanici adi : "); scanf("%39s", k.kullanici_adi);
+    printf("Şifre         : "); scanf("%39s", sifre);
+    sifre_hashle(sifre, k.sifre_hash);
+    printf("Ad Soyad      : "); scanf(" %79[^\n]", k.ad_soyad);
+    printf("E-posta       : "); scanf("%59s", k.email);
+    printf("Rol (1=Yonetici, 2=Personel, 3=Ogrenci): "); scanf("%d", &rol_sec);
+    if (rol_sec < 1 || rol_sec > 3) { printf("[HATA] Gecersiz rol.\n"); return; }
+    k.rol = (KullaniciRol)rol_sec;
+
+    kullanicilar[kullanici_sayisi++] = k;
+    kullanicilari_kaydet();
+    printf("[OK] Kullanici eklendi. (ID: %d)\n", k.id);
+}
+
+void kullanici_guncelle(void) {
+    if (aktif_kullanici->rol != YONETICI) {
+        printf("[YETKI HATASI]\n"); return;
+    }
+    int id;
+    printf("Guncellenecek kullanici ID: "); scanf("%d", &id);
+    for (int i = 0; i < kullanici_sayisi; i++) {
+        if (kullanicilar[i].id == id && kullanicilar[i].aktif) {
+            Kullanici *k = &kullanicilar[i];
+            printf("Yeni ad soyad (mevcut: %s): ", k->ad_soyad);
+            scanf(" %79[^\n]", k->ad_soyad);
+            printf("Yeni e-posta  (mevcut: %s): ", k->email);
+            scanf("%59s", k->email);
+            kullanicilari_kaydet();
+            printf("[OK] Kullanici guncellendi.\n");
+            return;
+        }
+    }
+    printf("[HATA] Kullanici bulunamadi.\n");
+}
+
+void kullanici_sil(void) {
+    if (aktif_kullanici->rol != YONETICI) {
+        printf("[YETKI HATASI]\n"); return;
+    }
+    int id;
+    printf("Silinecek kullanici ID: "); scanf("%d", &id);
+    if (id == aktif_kullanici->id) {
+        printf("[HATA] Kendinizi silemezsiniz.\n"); return;
+    }
+    for (int i = 0; i < kullanici_sayisi; i++) {
+        if (kullanicilar[i].id == id && kullanicilar[i].aktif) {
+            kullanicilar[i].aktif = 0;
+            kullanicilari_kaydet();
+            printf("[OK] Kullanici silindi.\n");
+            return;
+        }
+    }
+    printf("[HATA] Kullanici bulunamadi.\n");
+}
+
+/*
+   ÖDÜNÇ ALMA & İADE  (İş Paketi 4)
+*/
+
+void kitap_odunc_al(void) {
+    int kitap_id;
+    printf("Odunc alinacak kitap ID: "); scanf("%d", &kitap_id);
+
+    /* Kitap var mı? */
+    Kitap *k = NULL;
+    for (int i = 0; i < kitap_sayisi; i++)
+        if (kitaplar[i].id == kitap_id && kitaplar[i].aktif) { k = &kitaplar[i]; break; }
+    if (!k) { printf("[HATA] Kitap bulunamadi.\n"); return; }
+    if (k->mevcut <= 0) { printf("[HATA] Stokta kitap yok.\n"); return; }
+
+    /* Aynı kullanıcı zaten almış mı? */
+    for (int i = 0; i < odunc_sayisi; i++) {
+        if (oduncler[i].kullanici_id == aktif_kullanici->id &&
+            oduncler[i].kitap_id    == kitap_id &&
+            oduncler[i].durum       == ODUNC_AKTIF) {
+            printf("[HATA] Bu kitabi zaten odunc almissiniz.\n"); return;
+        }
+    }
+    if (odunc_sayisi >= MAX_ODUNC) { printf("[HATA] Kayit kapasitesi dolu.\n"); return; }
+
+    OduncKayit o = {0};
+    o.id             = yeni_odunc_id();
+    o.kullanici_id   = aktif_kullanici->id;
+    o.kitap_id       = kitap_id;
+    bugun_tarih(o.odunc_tarih);
+    iade_tarihi_hesapla(o.odunc_tarih, ODUNC_SURE_GUN, o.iade_tarih);
+    o.durum          = ODUNC_AKTIF;
+
+    k->mevcut--;
+    oduncler[odunc_sayisi++] = o;
+    tum_verileri_kaydet();
+
+    printf("[OK] Kitap odunc alindi.\n");
+    printf("     Odunc tarihi : %s\n", o.odunc_tarih);
+    printf("     Iade tarihi  : %s\n", o.iade_tarih);
+}
+
+void kitap_iade_et(void) {
+    int odunc_id;
+    printf("İade edilecek odunc ID: "); scanf("%d", &odunc_id);
+
+    for (int i = 0; i < odunc_sayisi; i++) {
+        OduncKayit *o = &oduncler[i];
+        if (o->id == odunc_id && o->durum == ODUNC_AKTIF) {
+            /* Yetki: kendi kaydı mı veya personel/yönetici mi? */
+            if (aktif_kullanici->rol == OGRENCI &&
+                o->kullanici_id != aktif_kullanici->id) {
+                printf("[YETKI HATASI] Baskasinin kaydini iade edemezsiniz.\n"); return;
+            }
+            bugun_tarih(o->gercek_iade);
+            o->durum = ODUNC_IADE;
+
+            /* Gecikme kontrolü */
+            int fark = gun_farki(o->iade_tarih, o->gercek_iade);
+            if (fark > 0)
+                printf("[UYARI] %d gün gecikmeli iade! Ceza uygulanabilir.\n", fark);
+            else
+                printf("[OK] Zamaninda iade. Tesekkürler.\n");
+
+            /* Stok geri ver */
+            for (int j = 0; j < kitap_sayisi; j++)
+                if (kitaplar[j].id == o->kitap_id) { kitaplar[j].mevcut++; break; }
+
+            tum_verileri_kaydet();
+            return;
+        }
+    }
+    printf("[HATA] Aktif odunc kaydi bulunamadi.\n");
+}
+
+/*
+   KİTAP ARAMA & LİSTELEME  (İş Paketi 5)
+*/
+
+/* Küçük harf dönüşüm */
+static void kucult(char *dst, const char *src) {
+    while (*src) {
+        char c = *src++;
+        if (c >= 'A' && c <= 'Z') c += 32;
+        *dst++ = c;
+    }
+    *dst = '\0';
+}
+
+void kitap_ara(void) {
+    char arama[100], a_kucuk[100], b_kucuk[200];
+    int  kriter;
+    printf("Arama kriteri (1=Ad, 2=Yazar, 3=ISBN, 4=Yayinevi): ");
+    scanf("%d", &kriter);
+    printf("Arama terimi: "); scanf(" %99[^\n]", arama);
+    kucult(a_kucuk, arama);
+
+    int bulunan = 0;
+    printf("\n%-5s %-30s %-25s %-8s %-6s\n",
+           "ID", "Ad", "Yazar", "Yil", "Mevcut");
+    printf("%-5s %-30s %-25s %-8s %-6s\n",
+           "---","---","---","---","---");
+
+    for (int i = 0; i < kitap_sayisi; i++) {
+        if (!kitaplar[i].aktif) continue;
+        const char *alan = "";
+        switch (kriter) {
+            case 1: alan = kitaplar[i].ad;       break;
+            case 2: alan = kitaplar[i].yazar;    break;
+            case 3: alan = kitaplar[i].isbn;     break;
+            case 4: alan = kitaplar[i].yayinevi; break;
+            default: alan = kitaplar[i].ad;
+        }
+        kucult(b_kucuk, alan);
+        if (strstr(b_kucuk, a_kucuk)) {
+            printf("%-5d %-30.30s %-25.25s %-8d %-6d\n",
+                   kitaplar[i].id,
+                   kitaplar[i].ad,
+                   kitaplar[i].yazar,
+                   kitaplar[i].yayin_yili,
+                   kitaplar[i].mevcut);
+            bulunan++;
+        }
+    }
+    printf("\nToplam %d sonuç bulundu.\n", bulunan);
+}
+
+/* Bubble Sort – ada göre */
+void kitaplari_sirala_ad(void) {
+    for (int i = 0; i < kitap_sayisi - 1; i++)
+        for (int j = 0; j < kitap_sayisi - i - 1; j++)
+            if (strcmp(kitaplar[j].ad, kitaplar[j+1].ad) > 0) {
+                Kitap tmp = kitaplar[j];
+                kitaplar[j]   = kitaplar[j+1];
+                kitaplar[j+1] = tmp;
+            }
+}
+
+void tum_kitaplari_listele(void) {
+    kitaplari_sirala_ad();
+    printf("\n%-5s %-20s %-30s %-20s %-8s %-5s %-5s %-10s\n",
+           "ID","ISBN","Ad","Yazar","Yayinevi","Yil","Mevcut","Konum");
+    printf("%-5s %-20s %-30s %-20s %-8s %-5s %-5s %-10s\n",
+           "---","---","---","---","---","---","---","---");
+    int sayac = 0;
+    for (int i = 0; i < kitap_sayisi; i++) {
+        if (!kitaplar[i].aktif) continue;
+        printf("%-5d %-20.20s %-30.30s %-20.20s %-8.8s %-5d %-5d %-10.10s\n",
+               kitaplar[i].id,
+               kitaplar[i].isbn,
+               kitaplar[i].ad,
+               kitaplar[i].yazar,
+               kitaplar[i].yayinevi,
+               kitaplar[i].yayin_yili,
+               kitaplar[i].mevcut,
+               kitaplar[i].konum);
+        sayac++;
+    }
+    printf("\nToplam %d kitap.\n", sayac);
+}
+
+/*
+   RAPORLAMA & İSTATİSTİKLER  (İş Paketi 6)
+*/
+
+void envanter_ozeti(void) {
+    baslik_yazdir("ENVANTER OZETI");
+    int toplam = 0, mevcut = 0, oduncte = 0;
+    for (int i = 0; i < kitap_sayisi; i++) {
+        if (!kitaplar[i].aktif) continue;
+        toplam  += kitaplar[i].stok;
+        mevcut  += kitaplar[i].mevcut;
+        oduncte += kitaplar[i].stok - kitaplar[i].mevcut;
+    }
+    printf("Toplam kitap cesidi : %d\n", kitap_sayisi);
+    printf("Toplam stok         : %d\n", toplam);
+    printf("Mevcut (rafta)      : %d\n", mevcut);
+    printf("Oduncte             : %d\n", oduncte);
+    printf("Aktif kullanici     : ");
+    int ak = 0;
+    for (int i = 0; i < kullanici_sayisi; i++) if (kullanicilar[i].aktif) ak++;
+    printf("%d\n", ak);
+}
+
+void geckmis_iadeler(void) {
+    baslik_yazdir("GECIKMIS IADELER");
+    char bugun[12];
+    bugun_tarih(bugun);
+    int bulunan = 0;
+
+    printf("%-6s %-20s %-30s %-12s %-12s %-6s\n",
+           "ÖdID","Kullanici","Kitap","Iade Tarihi","Bugun","Gecikme");
+    printf("%-6s %-20s %-30s %-12s %-12s %-6s\n",
+           "---","---","---","---","---","---");
+
+    for (int i = 0; i < odunc_sayisi; i++) {
+        OduncKayit *o = &oduncler[i];
+        if (o->durum != ODUNC_AKTIF) continue;
+        int fark = gun_farki(o->iade_tarih, bugun);
+        if (fark <= 0) continue;
+
+        /* Kullanıcı adı */
+        char kad[40] = "?";
+        for (int j = 0; j < kullanici_sayisi; j++)
+            if (kullanicilar[j].id == o->kullanici_id)
+                { strncpy(kad, kullanicilar[j].ad_soyad, 39); break; }
+
+        /* Kitap adı */
+        char kad2[30] = "?";
+        for (int j = 0; j < kitap_sayisi; j++)
+            if (kitaplar[j].id == o->kitap_id)
+                { strncpy(kad2, kitaplar[j].ad, 29); break; }
+
+        printf("%-6d %-20.20s %-30.30s %-12s %-12s %-6d\n",
+               o->id, kad, kad2, o->iade_tarih, bugun, fark);
+        bulunan++;
+    }
+    if (!bulunan) printf("Gecikmis iade yok.\n");
+}
+
+void populer_kitaplar(void) {
+    baslik_yazdir("EN COK ODUNC ALINAN KITAPLAR (Top 5)");
+
+    int sayac[MAX_KITAP] = {0};
+    for (int i = 0; i < odunc_sayisi; i++)
+        for (int j = 0; j < kitap_sayisi; j++)
+            if (kitaplar[j].id == oduncler[i].kitap_id) { sayac[j]++; break; }
+
+    /* Basit seçim sıralaması (azalan) */
+    int siralama[MAX_KITAP];
+    for (int i = 0; i < kitap_sayisi; i++) siralama[i] = i;
+    for (int i = 0; i < kitap_sayisi - 1; i++)
+        for (int j = i + 1; j < kitap_sayisi; j++)
+            if (sayac[siralama[j]] > sayac[siralama[i]]) {
+                int t = siralama[i]; siralama[i] = siralama[j]; siralama[j] = t;
+            }
+
+    int limit = kitap_sayisi < 5 ? kitap_sayisi : 5;
+    printf("%-5s %-35s %-25s %-8s\n", "Sira","Kitap Adi","Yazar","Odunc");
+    printf("%-5s %-35s %-25s %-8s\n","---","---","---","---");
+    for (int i = 0; i < limit; i++) {
+        int idx = siralama[i];
+        if (!kitaplar[idx].aktif) continue;
+        printf("%-5d %-35.35s %-25.25s %-8d\n",
+               i+1,
+               kitaplar[idx].ad,
+               kitaplar[idx].yazar,
+               sayac[idx]);
+    }
+}
+
+/*
+   MENÜLER
+*/
+
+void kitap_menusu(void) {
+    int sec;
+    do {
+        baslik_yazdir("KITAP ISLEMLERI");
+        printf("1. Tum Kitaplari Listele\n");
+        printf("2. Kitap Ara\n");
+        printf("3. Kitap Ekle\n");
+        printf("4. Kitap Guncelle\n");
+        printf("5. Kitap Sil\n");
+        printf("0. Geri\n");
+        printf("Seçim: "); scanf("%d", &sec);
+        switch (sec) {
+            case 1: tum_kitaplari_listele(); break;
+            case 2: kitap_ara();             break;
+            case 3: kitap_ekle();            break;
+            case 4: kitap_guncelle();        break;
+            case 5: kitap_sil();             break;
+        }
+    } while (sec != 0);
+}
+
+void kullanici_menusu(void) {
+    if (aktif_kullanici->rol != YONETICI) {
+        printf("[YETKI HATASI]\n"); return;
+    }
+    int sec;
+    do {
+        baslik_yazdir("KULLANICI YONETIMI");
+        printf("1. Kullanici Ekle\n");
+        printf("2. Kullanici Guncelle\n");
+        printf("3. Kullanici Sil\n");
+        printf("0. Geri\n");
+        printf("Secim: "); scanf("%d", &sec);
+        switch (sec) {
+            case 1: kullanici_ekle();    break;
+            case 2: kullanici_guncelle(); break;
+            case 3: kullanici_sil();     break;
+        }
+    } while (sec != 0);
+}
+
+void odunc_menusu(void) {
+    int sec;
+    do {
+        baslik_yazdir("ODUNC / IADE ISLEMLERI");
+        printf("1. Kitap Odunc Al\n");
+        printf("2. Kitap Iade Et\n");
+        printf("0. Geri\n");
+        printf("Seçim: "); scanf("%d", &sec);
+        switch (sec) {
+            case 1: kitap_odunc_al(); break;
+            case 2: kitap_iade_et();  break;
+        }
+    } while (sec != 0);
+}
+
+void rapor_menusu(void) {
+    int sec;
+    do {
+        baslik_yazdir("RAPORLAR & ISTATISTIKLER");
+        printf("1. Envanter ozeti\n");
+        printf("2. Gecikmis Iadeler\n");
+        printf("3. Populer Kitaplar\n");
+        printf("0. Geri\n");
+        printf("Seçim: "); scanf("%d", &sec);
+        switch (sec) {
+            case 1: envanter_ozeti();    break;
+            case 2: geckmis_iadeler();   break;
+            case 3: populer_kitaplar();  break;
+        }
+    } while (sec != 0);
+}
+
+void ana_menu(void) {
+    int sec;
+    do {
+        baslik_yazdir("ANA MENU");
+        printf("Giris: %s  [%s]\n\n",
+               aktif_kullanici->ad_soyad,
+               aktif_kullanici->rol == YONETICI ? "YONETICI" :
+               aktif_kullanici->rol == PERSONEL ? "PERSONEL" : "OGRENCİ");
+
+        printf("1. Kitap Islemleri\n");
+        printf("2. Odunc / Iade Islemleri\n");
+        if (aktif_kullanici->rol == YONETICI)
+            printf("3. Kullanici Yonetimi\n");
+        if (aktif_kullanici->rol != OGRENCI)
+            printf("4. Raporlar & Istatistikler\n");
+        printf("0. Cikis / Oturumu Kapat\n");
+        printf("Seçim: "); scanf("%d", &sec);
+
+        switch (sec) {
+            case 1: kitap_menusu();    break;
+            case 2: odunc_menusu();    break;
+            case 3:
+                if (aktif_kullanici->rol == YONETICI) kullanici_menusu();
+                break;
+            case 4:
+                if (aktif_kullanici->rol != OGRENCI) rapor_menusu();
+                break;
+        }
+    } while (sec != 0);
+    aktif_kullanici = NULL;
+}
+
+/*
+   MAIN
+*/
+int main(void) {
+    tum_verileri_yukle();
+    varsayilan_yonetici_olustur();
+
+    printf("\n");
+    printf("  ╔══════════════════════════════════════════╗\n");
+    printf("  ║   KÜTÜPHANE ENVANTER YÖNETİM SİSTEMİ    ║\n");
+    printf("  ║       İzmir Bakircay Üniversitesi  ║\n");
+    printf("  ╚══════════════════════════════════════════╝\n\n");
+
+    int devam = 1;
+    while (devam) {
+        if (kullanici_girisi()) {
+            ana_menu();
+        } else {
+            printf("\nTekrar denemek ister misiniz? (1=Evet, 0=Hayir): ");
+            scanf("%d", &devam);
+        }
+    }
+
+    printf("\nSistemden cikiliyor... Gorusmek uzere!\n");
+    return 0;
+}
