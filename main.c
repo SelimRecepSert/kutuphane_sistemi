@@ -7,6 +7,7 @@
 typedef struct {
     char kullaniciAdi[30];
     char sifre[10];
+    char hex_sifre[30];
 } Kisi;
 
 // Kitaplar icin struct yapisi:
@@ -23,6 +24,44 @@ typedef struct {
     int kitapId;
     char kitapAd[50];
 } KullaniciKitap;
+
+//sifreleme fonksiyonu(XOR)
+void sifreleme(char normalSifre[10],char HexSifre[30]){
+    int i=0;
+    int j=0;
+    int key=5;
+
+while (normalSifre[i]!='\0')
+{
+    int sifrex=normalSifre[i] ^ key;         //burada sifreyi xor'layıp int değişkeni olarak tutuyoruz 
+    //cünkü bazı space ve bosuklarda scanf okuma atsı verebiliyor bunun nüne gecmek icin aslında
+    sprintf(&HexSifre[j], "%02x", sifrex);
+    i++;
+    j+=2;
+}
+HexSifre[j] = '\0';
+}
+//Sifreyi cözdügümz kisim
+void sifreCoz(char normalSifre[10],char HexSifre[30]){
+
+    int i= 0; 
+    int j = 0; 
+    int key= 5;
+        
+    // Şifreli metin bitene kadar döngü
+    while (HexSifre[j] != '\0') {
+        int sayi;
+        sscanf(&HexSifre[j], "%02x", &sayi); 
+            
+        // Çıkan sayıyı anahtarla tekrar XOR'la ve char dizigeri çevir
+        normalSifre[i] = sayi ^ key;
+        j+= 2;
+        i++;
+        }
+        
+        
+        normalSifre[i] = '\0';       //bu önceki çöp değerleri kullanmıyacağımız kısımlar icin.
+    }
 
 // Kucuk harfe cevirme fonksiyonu:
 void kucukHarfCevir(char *kaynak, char *hedef) {
@@ -50,9 +89,11 @@ void kayitOl(char *kayit) {
     
     printf("Sifre: ");
     scanf("%s", yeniKisi.sifre);
+
+    sifreleme(yeniKisi.sifre,yeniKisi.hex_sifre);
     
     // Kullanıcı verilerinin dosyaya yazdirilmasi:
-    fprintf(dosya, "%s %s\n", yeniKisi.kullaniciAdi, yeniKisi.sifre);
+    fprintf(dosya, "%s %s\n", yeniKisi.kullaniciAdi, yeniKisi.hex_sifre);
     
     printf("Kayit tamamlandi!\n");
 
@@ -80,7 +121,8 @@ int girisYap(char *kayit, char *aktifKullanici) {
     system("cls");
     
     // Dosyayi satir satir okuyup eslesme aranir:
-    while (fscanf(dosya, "%s %s", okunanKisi.kullaniciAdi, okunanKisi.sifre) != EOF) {
+    while (fscanf(dosya, "%s %s", okunanKisi.kullaniciAdi, okunanKisi.hex_sifre) != EOF) {
+        sifreCoz(okunanKisi.sifre, okunanKisi.hex_sifre);
         if (strcmp(girilenKisi.kullaniciAdi, okunanKisi.kullaniciAdi) == 0 && strcmp(girilenKisi.sifre, okunanKisi.sifre) == 0) {
             girisBasarili = 1;
             strcpy(aktifKullanici, girilenKisi.kullaniciAdi); // Giris yapan kisinin adini sakla
